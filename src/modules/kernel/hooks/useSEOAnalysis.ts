@@ -215,21 +215,26 @@ export function useSEOAnalysis(territoryId: string | undefined) {
       const { data: savedAnalysis, error: saveError } = await supabase
         .from("seo_analyses")
         .insert(insertPayload)
-        .select()
+        .select("*")
         .single();
 
       if (saveError) throw saveError;
 
       const newAnalysis = savedAnalysis as SEOAnalysis;
+      const analysisWithDesktop: SEOAnalysis = {
+        ...newAnalysis,
+        desktop_scores: newAnalysis.desktop_scores ?? result.desktopScores ?? null,
+        full_report_desktop: newAnalysis.full_report_desktop ?? result.fullReportDesktop ?? null,
+      };
 
-      setAnalyses((prev) => [newAnalysis, ...prev]);
-      setSelectedAnalysis(newAnalysis);
+      setAnalyses((prev) => [analysisWithDesktop, ...prev]);
+      setSelectedAnalysis(analysisWithDesktop);
 
       toast({
         title: "Analyse terminée",
-        description: newAnalysis.desktop_scores
-          ? `Mobile & Desktop analysés. Score SEO: ${newAnalysis.seo_score}/100 (mobile)`
-          : `Score SEO: ${newAnalysis.seo_score}/100`,
+        description: analysisWithDesktop.desktop_scores
+          ? `Mobile & Desktop analysés. Score SEO: ${analysisWithDesktop.seo_score}/100 (mobile). Utilisez la vue « Vue » pour basculer.`
+          : `Score SEO: ${analysisWithDesktop.seo_score}/100`,
       });
     } catch (error) {
       console.error("SEO analysis error:", error);

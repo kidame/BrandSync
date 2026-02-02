@@ -15,6 +15,9 @@ import {
   Package,
   Code2,
   Heading,
+  Smartphone,
+  Monitor,
+  GitCompare,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -35,27 +38,67 @@ import { ReportLinksAudit } from "./ReportLinksAudit";
 import { ReportResourcesAudit } from "./ReportResourcesAudit";
 import { ReportStructuredData } from "./ReportStructuredData";
 import { ReportHeadingStructure } from "./ReportHeadingStructure";
+import { ReportComparison } from "./ReportComparison";
+import { useAIComparison } from "../../hooks/useAIComparison";
+import type { AnalyzeSEOComparisonPayload, CoreWebVitalsMetrics } from "../../types/seoReport";
 
 interface SEOReportViewerProps {
   analysis: SEOAnalysis;
   projectName?: string;
 }
 
+type DeviceView = "mobile" | "desktop";
+
 export function SEOReportViewer({ analysis, projectName }: SEOReportViewerProps) {
   const { parseReport } = useParseLighthouseReport();
   const { exportToPdf, isExporting } = useSEOProfessionalPdfExport();
   const [activeTab, setActiveTab] = useState("cover");
+  const [deviceView, setDeviceView] = useState<DeviceView>("mobile");
 
-  const report = parseReport(analysis);
+  const { report, reportDesktop } = parseReport(analysis);
+  const hasDesktop = Boolean(reportDesktop);
+  const displayReport = deviceView === "desktop" && reportDesktop ? reportDesktop : report;
 
-  const handleExportPdf = () => {
-    exportToPdf(report, projectName);
+  const {
+    analysis: aiAnalysis,
+    isLoading: isLoadingAI,
+    error: aiError,
+    generateAnalysis: generateAIAnalysis,
+  } = useAIComparison();
+
+  const perfToCWV = (m: typeof report.performanceMetrics): CoreWebVitalsMetrics => ({
+    fcp: m.fcp?.value ?? 0,
+    lcp: m.lcp?.value ?? 0,
+    tbt: m.tbt?.value ?? 0,
+    cls: m.cls?.value ?? 0,
+    si: m.speedIndex?.value ?? 0,
+    tti: m.tti?.value ?? 0,
+  });
+
+  const handleGenerateAI = () => {
+    if (!reportDesktop) return;
+    const payload: AnalyzeSEOComparisonPayload = {
+      website_url: report.metadata.url,
+      mobile_scores: report.scores,
+      desktop_scores: reportDesktop.scores,
+      mobile_metrics: perfToCWV(report.performanceMetrics),
+      desktop_metrics: perfToCWV(reportDesktop.performanceMetrics),
+      images_without_alt_count: report.extendedData?.imagesWithoutAlt?.length ?? 0,
+      render_blocking_count: report.extendedData?.renderBlockingResources?.length ?? 0,
+      unused_js_bytes: report.extendedData?.unusedJavascript?.reduce((s, u) => s + (u.wastedBytes ?? 0), 0) || undefined,
+    };
+    generateAIAnalysis(payload);
   };
 
-  const hasExtended = Boolean(report.extendedData);
+  const handleExportPdf = () => {
+    exportToPdf(displayReport, projectName);
+  };
+
+  const hasExtended = Boolean(displayReport.extendedData);
   const tabs = [
     { id: "cover", label: "Couverture", icon: FileText },
     { id: "summary", label: "Résumé", icon: BarChart3 },
+    ...(hasDesktop ? [{ id: "comparison" as const, label: "Comparatif", icon: GitCompare }] : []),
     { id: "seo", label: "SEO", icon: Search },
     { id: "performance", label: "Performance", icon: Gauge },
     { id: "accessibility", label: "Accessibilité", icon: Eye },
@@ -75,10 +118,26 @@ export function SEOReportViewer({ analysis, projectName }: SEOReportViewerProps)
 
   return (
     <div className="space-y-4">
-      {/* Action Bar */}
-      <div className="flex items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg">
-        <div className="text-sm text-muted-foreground">
-          Rapport d'audit SEO professionnel
+      {/* Ligne 1 : Titre + vue actuelle + boutons */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-muted/50 rounded-lg border">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-foreground">
+            Rapport d'audit SEO professionnel
+          </span>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary"
+            title={hasDesktop ? "Choisir Mobile ou Desktop ci-dessous" : "Vue Mobile uniquement"}
+          >
+            {hasDesktop ? (
+              deviceView === "desktop" ? (
+                <><Monitor className="h-3.5 w-3.5" /> Vue Desktop</>
+              ) : (
+                <><Smartphone className="h-3.5 w-3.5" /> Vue Mobile</>
+              )
+            ) : (
+              <><Smartphone className="h-3.5 w-3.5" /> Vue Mobile</>
+            )}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -96,6 +155,40 @@ export function SEOReportViewer({ analysis, projectName }: SEOReportViewerProps)
             Partager
           </Button>
         </div>
+      </div>
+
+      {/* Ligne 2 : Choix Mobile / Desktop — toujours visible */}
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3 rounded-lg border-2 border-primary/20 bg-card shadow-sm">
+        <span className="text-sm font-semibold text-foreground shrink-0">Choisir la vue :</span>
+        {hasDesktop ? (
+          <>
+            <Tabs
+              value={deviceView}
+              onValueChange={(v) => setDeviceView(v as DeviceView)}
+              className="w-auto"
+            >
+              <TabsList className="grid grid-cols-2 h-10 bg-muted">
+                <TabsTrigger value="mobile" className="gap-2">
+                  <Smartphone className="h-4 w-4" />
+                  Mobile
+                </TabsTrigger>
+                <TabsTrigger value="desktop" className="gap-2">
+                  <Monitor className="h-4 w-4" />
+                  Desktop
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <span className="text-xs text-muted-foreground">
+              {deviceView === "desktop"
+                ? "Rapport complet issu de l’audit Desktop (scores, métriques, opportunités)."
+                : "Rapport complet issu de l’audit Mobile."}
+            </span>
+          </>
+        ) : (
+          <span className="text-sm text-muted-foreground">
+            Vue Mobile uniquement. Lancez une <strong>nouvelle analyse</strong> pour obtenir une vue Desktop distincte.
+          </span>
+        )}
       </div>
 
       {/* Main Content with Tabs */}
@@ -118,82 +211,102 @@ export function SEOReportViewer({ analysis, projectName }: SEOReportViewerProps)
         <div className="min-h-[500px]">
           <TabsContent value="cover" className="mt-0">
             <ReportCover
-              metadata={report.metadata}
-              scores={report.scores}
-              desktopScores={report.desktopScores}
+              metadata={displayReport.metadata}
+              scores={displayReport.scores}
+              desktopScores={hasDesktop && reportDesktop ? (deviceView === "desktop" ? report.scores : reportDesktop.scores) : undefined}
               projectName={projectName}
+              deviceView={deviceView}
             />
           </TabsContent>
 
           <TabsContent value="summary" className="mt-0">
             <ReportSummary 
-              scores={report.scores} 
-              strengths={report.strengths}
-              criticalIssues={report.criticalIssues}
+              scores={displayReport.scores} 
+              strengths={displayReport.strengths}
+              criticalIssues={displayReport.criticalIssues}
             />
           </TabsContent>
 
+          {hasDesktop && reportDesktop && (
+            <TabsContent value="comparison" className="mt-0">
+              <ReportComparison
+                mobileScores={report.scores}
+                desktopScores={reportDesktop.scores}
+                mobileMetrics={report.performanceMetrics}
+                desktopMetrics={reportDesktop.performanceMetrics}
+                websiteUrl={report.metadata.url}
+                aiAnalysis={aiAnalysis}
+                isLoadingAI={isLoadingAI}
+                onGenerateAI={handleGenerateAI}
+                aiError={aiError}
+                imagesWithoutAltCount={report.extendedData?.imagesWithoutAlt?.length ?? 0}
+                renderBlockingCount={report.extendedData?.renderBlockingResources?.length ?? 0}
+                unusedJsBytes={report.extendedData?.unusedJavascript?.reduce((s, u) => s + (u.wastedBytes ?? 0), 0)}
+              />
+            </TabsContent>
+          )}
+
           <TabsContent value="seo" className="mt-0">
             <ReportSEODetails 
-              seoDetails={report.seoDetails} 
-              seoScore={report.scores.seo}
+              seoDetails={displayReport.seoDetails} 
+              seoScore={displayReport.scores.seo}
             />
           </TabsContent>
 
           <TabsContent value="performance" className="mt-0">
             <ReportPerformance 
-              metrics={report.performanceMetrics} 
-              performanceScore={report.scores.performance}
+              metrics={displayReport.performanceMetrics} 
+              performanceScore={displayReport.scores.performance}
             />
           </TabsContent>
 
           <TabsContent value="accessibility" className="mt-0">
             <ReportAccessibility 
-              accessibility={report.accessibility}
-              accessibilityScore={report.scores.accessibility}
+              accessibility={displayReport.accessibility}
+              accessibilityScore={displayReport.scores.accessibility}
             />
           </TabsContent>
 
           <TabsContent value="best-practices" className="mt-0">
             <ReportBestPractices 
-              bestPractices={report.bestPractices}
-              bestPracticesScore={report.scores.bestPractices}
+              bestPractices={displayReport.bestPractices}
+              bestPracticesScore={displayReport.scores.bestPractices}
             />
           </TabsContent>
 
           <TabsContent value="opportunities" className="mt-0">
-            <ReportOpportunities opportunities={report.opportunities} />
+            <ReportOpportunities opportunities={displayReport.opportunities} />
           </TabsContent>
 
-          {hasExtended && report.extendedData && (
+          {hasExtended && displayReport.extendedData && (
             <>
               <TabsContent value="images" className="mt-0">
-                <ReportImagesAudit imagesWithoutAlt={report.extendedData.imagesWithoutAlt} />
+                <ReportImagesAudit imagesWithoutAlt={displayReport.extendedData.imagesWithoutAlt} />
               </TabsContent>
               <TabsContent value="links" className="mt-0">
-                <ReportLinksAudit linksWithoutText={report.extendedData.linksWithoutText} />
+                <ReportLinksAudit linksWithoutText={displayReport.extendedData.linksWithoutText} />
               </TabsContent>
               <TabsContent value="resources" className="mt-0">
                 <ReportResourcesAudit
-                  pageMetrics={report.extendedData.pageMetrics}
-                  renderBlockingResources={report.extendedData.renderBlockingResources}
-                  unusedJavascript={report.extendedData.unusedJavascript}
-                  unusedCss={report.extendedData.unusedCss}
+                  pageMetrics={displayReport.extendedData.pageMetrics}
+                  renderBlockingResources={displayReport.extendedData.renderBlockingResources}
+                  unusedJavascript={displayReport.extendedData.unusedJavascript}
+                  unusedCss={displayReport.extendedData.unusedCss}
                 />
               </TabsContent>
               <TabsContent value="structured-data" className="mt-0">
                 <ReportStructuredData
-                  structuredData={report.extendedData.structuredData}
-                  metaTags={report.extendedData.metaTags}
+                  structuredData={displayReport.extendedData.structuredData}
+                  metaTags={displayReport.extendedData.metaTags}
                 />
               </TabsContent>
               <TabsContent value="headings" className="mt-0">
-                <ReportHeadingStructure headingStructure={report.extendedData.headingStructure} />
+                <ReportHeadingStructure headingStructure={displayReport.extendedData.headingStructure} />
               </TabsContent>
             </>
           )}
           <TabsContent value="recommendations" className="mt-0">
-            <ReportRecommendations recommendations={report.recommendations} />
+            <ReportRecommendations recommendations={displayReport.recommendations} />
           </TabsContent>
         </div>
       </Tabs>

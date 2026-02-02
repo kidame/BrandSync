@@ -154,8 +154,8 @@ export function SEOAnalysisResults({ analysis, projectName }: SEOAnalysisResults
         </CardHeader>
       </Card>
 
-      {/* Toggle Mobile / Desktop */}
-      {hasDesktop && (
+      {/* Toggle Mobile / Desktop (visible uniquement pour les analyses avec scores desktop) */}
+      {hasDesktop ? (
         <Tabs value={deviceView} onValueChange={(v) => setDeviceView(v as DeviceView)}>
           <TabsList className="grid w-full max-w-xs grid-cols-2">
             <TabsTrigger value="mobile" className="gap-2">
@@ -168,6 +168,11 @@ export function SEOAnalysisResults({ analysis, projectName }: SEOAnalysisResults
             </TabsTrigger>
           </TabsList>
         </Tabs>
+      ) : (
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          <Smartphone className="h-4 w-4 shrink-0" />
+          Affichage Mobile. Pour comparer Mobile et Desktop, lancez une <strong>nouvelle analyse</strong> (les anciennes n’ont pas les scores desktop).
+        </p>
       )}
 
       {/* Score Cards Grid */}

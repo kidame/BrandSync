@@ -10,9 +10,10 @@ interface ReportCoverProps {
   scores: SEOReportScores;
   desktopScores?: SEOReportScores | null;
   projectName?: string;
+  deviceView?: "mobile" | "desktop";
 }
 
-export function ReportCover({ metadata, scores, desktopScores, projectName }: ReportCoverProps) {
+export function ReportCover({ metadata, scores, desktopScores, projectName, deviceView }: ReportCoverProps) {
   const getStatusConfig = (status: SEOReportMetadata['status']) => {
     switch (status) {
       case 'excellent':
@@ -36,6 +37,11 @@ export function ReportCover({ metadata, scores, desktopScores, projectName }: Re
           <TrendingUp className="h-8 w-8" />
           <h1 className="text-3xl font-bold">Audit SEO & Performance Web</h1>
         </div>
+        {deviceView && (
+          <p className="text-sm font-medium text-muted-foreground">
+            Vue {deviceView === "desktop" ? "Desktop" : "Mobile"}
+          </p>
+        )}
         {projectName && (
           <p className="text-muted-foreground">Projet: {projectName}</p>
         )}
@@ -103,7 +109,11 @@ export function ReportCover({ metadata, scores, desktopScores, projectName }: Re
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {label}
-                  {desktopScores && <span className="block">M / D</span>}
+                  {desktopScores && (
+                    <span className="block">
+                      {deviceView === "desktop" ? "D / M" : "M / D"}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
