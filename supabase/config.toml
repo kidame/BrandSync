@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.analyze-seo]
 verify_jwt = false
 
+[functions.analyze-seo-comparison]
+verify_jwt = false
+
 [functions.process-linkedin-offers]
 verify_jwt = false
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Download,
   Share2,
@@ -64,7 +64,12 @@ export function SEOReportViewer({ analysis, projectName }: SEOReportViewerProps)
     isLoading: isLoadingAI,
     error: aiError,
     generateAnalysis: generateAIAnalysis,
+    reset: resetAIAnalysis,
   } = useAIComparison();
+
+  useEffect(() => {
+    resetAIAnalysis();
+  }, [analysis.id, analysis.website_url, resetAIAnalysis]);
 
   const perfToCWV = (m: typeof report.performanceMetrics): CoreWebVitalsMetrics => ({
     fcp: m.fcp?.value ?? 0,

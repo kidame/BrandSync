@@ -92,15 +92,22 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: false, error: "OPENAI_API_KEY non configurée. Configurez le secret dans Supabase (Edge Functions → Secrets)." });
     }
 
+    const fmt = (v: number | undefined | null) => (v == null || Number.isNaN(v) ? 0 : v);
+    const fmtMs = (v: number | undefined | null) => (fmt(v) / 1000).toFixed(2);
+    const fmtCls = (v: number | undefined | null) => fmt(v).toFixed(2);
+    const mobileM = body.mobile_metrics;
+    const desktopM = body.desktop_metrics;
+    const mobileMetricsLine = mobileM
+      ? `\nMétriques Mobile (CWV) : FCP ${fmtMs(mobileM.fcp)}s, LCP ${fmtMs(mobileM.lcp)}s, TBT ${fmt(mobileM.tbt)}ms, CLS ${fmtCls(mobileM.cls)}, SI ${fmtMs(mobileM.si)}s, TTI ${fmtMs(mobileM.tti)}s`
+      : "";
+    const desktopMetricsLine = desktopM
+      ? `\nMétriques Desktop (CWV) : FCP ${fmtMs(desktopM.fcp)}s, LCP ${fmtMs(desktopM.lcp)}s, TBT ${fmt(desktopM.tbt)}ms, CLS ${fmtCls(desktopM.cls)}, SI ${fmtMs(desktopM.si)}s, TTI ${fmtMs(desktopM.tti)}s`
+      : "";
+
     const userContent = `Site : ${websiteUrl}
 
 Scores Mobile : SEO ${mobileScores.seo ?? 0}, Performance ${mobileScores.performance ?? 0}, Accessibilité ${mobileScores.accessibility ?? 0}, Bonnes pratiques ${mobileScores.bestPractices ?? 0}
-Scores Desktop : SEO ${desktopScores.seo ?? 0}, Performance ${desktopScores.performance ?? 0}, Accessibilité ${desktopScores.accessibility ?? 0}, Bonnes pratiques ${desktopScores.bestPractices ?? 0}
-${body.mobile_metrics ? `
-Métriques Mobile (CWV) : FCP ${(body.mobile_metrics.fcp / 1000).toFixed(2)}s, LCP ${(body.mobile_metrics.lcp / 1000).toFixed(2)}s, TBT ${body.mobile_metrics.tbt}ms, CLS ${body.mobile_metrics.cls.toFixed(2)}, SI ${(body.mobile_metrics.si / 1000).toFixed(2)}s, TTI ${(body.mobile_metrics.tti / 1000).toFixed(2)}s
-` : ""}${body.desktop_metrics ? `
-Métriques Desktop (CWV) : FCP ${(body.desktop_metrics.fcp / 1000).toFixed(2)}s, LCP ${(body.desktop_metrics.lcp / 1000).toFixed(2)}s, TBT ${body.desktop_metrics.tbt}ms, CLS ${body.desktop_metrics.cls.toFixed(2)}, SI ${(body.desktop_metrics.si / 1000).toFixed(2)}s, TTI ${(body.desktop_metrics.tti / 1000).toFixed(2)}s
-` : ""}${body.images_without_alt_count != null ? `\nImages sans alt : ${body.images_without_alt_count}` : ""}${body.render_blocking_count != null ? `\nRessources bloquantes : ${body.render_blocking_count}` : ""}${body.unused_js_bytes != null ? `\nJS inutilisé (octets) : ${body.unused_js_bytes}` : ""}
+Scores Desktop : SEO ${desktopScores.seo ?? 0}, Performance ${desktopScores.performance ?? 0}, Accessibilité ${desktopScores.accessibility ?? 0}, Bonnes pratiques ${desktopScores.bestPractices ?? 0}${mobileMetricsLine}${desktopMetricsLine}${body.images_without_alt_count != null ? `\nImages sans alt : ${body.images_without_alt_count}` : ""}${body.render_blocking_count != null ? `\nRessources bloquantes : ${body.render_blocking_count}` : ""}${body.unused_js_bytes != null ? `\nJS inutilisé (octets) : ${body.unused_js_bytes}` : ""}
 
 Analyse les différences et retourne le JSON avec "analysis" (markdown), "priority" et "key_issues".`;
 
@@ -124,6 +131,9 @@ Analyse les différences et retourne le JSON avec "analysis" (markdown), "priori
     if (!openaiRes.ok) {
       const errText = await openaiRes.text();
       console.error("[analyze-seo-comparison] OpenAI error", openaiRes.status, errText?.slice(0, 300));
+      if (openaiRes.status === 401) {
+        return jsonResponse({ success: false, error: "Clé API OpenAI invalide. Vérifiez OPENAI_API_KEY dans Supabase (Edge Functions → Secrets), puis redéployez la fonction." });
+      }
       if (openaiRes.status === 429) {
         return jsonResponse({ success: false, error: "Quota API OpenAI dépassé. Réessayez plus tard." });
       }
