@@ -175,7 +175,7 @@ export function useEnrichedCompanies(
       if (auditIds.length > 0) {
         const { data: seoData, error: seoError } = await supabase
           .from("seo_analyses")
-          .select("id, seo_score, performance_score, accessibility_score, best_practices_score, full_report, website_url, meta_description, has_meta_description, title_tag, has_viewport, is_crawlable, created_at, analyzed_at, territory_id")
+          .select("id, seo_score, performance_score, accessibility_score, best_practices_score, full_report, full_report_desktop, desktop_scores, website_url, meta_description, has_meta_description, title_tag, has_viewport, is_crawlable, created_at, analyzed_at, territory_id")
           .in("id", auditIds);
 
         if (!seoError && seoData) {

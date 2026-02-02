@@ -201,3 +201,34 @@ export function getMetricStatus(score: number): 'good' | 'needs-improvement' | '
   if (score >= 0.5) return 'needs-improvement';
   return 'poor';
 }
+
+/** Métriques Core Web Vitals brutes (pour comparatif Mobile vs Desktop) */
+export interface CoreWebVitalsMetrics {
+  fcp: number;  // First Contentful Paint (ms)
+  lcp: number;  // Largest Contentful Paint (ms)
+  tbt: number;  // Total Blocking Time (ms)
+  cls: number;  // Cumulative Layout Shift
+  si: number;   // Speed Index (ms)
+  tti: number;  // Time to Interactive (ms)
+}
+
+/** Payload pour l'analyse IA du comparatif */
+export interface AnalyzeSEOComparisonPayload {
+  website_url: string;
+  mobile_scores: SEOReportScores;
+  desktop_scores: SEOReportScores;
+  mobile_metrics?: CoreWebVitalsMetrics;
+  desktop_metrics?: CoreWebVitalsMetrics;
+  images_without_alt_count?: number;
+  render_blocking_count?: number;
+  unused_js_bytes?: number;
+}
+
+/** Réponse de l'Edge Function analyze-seo-comparison */
+export interface AnalyzeSEOComparisonResponse {
+  success: boolean;
+  analysis?: string;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  key_issues?: string[];
+  error?: string;
+}
