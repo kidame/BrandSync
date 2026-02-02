@@ -1,5 +1,21 @@
 import { useState } from "react";
-import { Download, Share2, FileText, BarChart3, Search, Gauge, Eye, Shield, Lightbulb, ClipboardList } from "lucide-react";
+import {
+  Download,
+  Share2,
+  FileText,
+  BarChart3,
+  Search,
+  Gauge,
+  Eye,
+  Shield,
+  Lightbulb,
+  ClipboardList,
+  Image,
+  Link2,
+  Package,
+  Code2,
+  Heading,
+} from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,6 +30,11 @@ import { ReportAccessibility } from "./ReportAccessibility";
 import { ReportBestPractices } from "./ReportBestPractices";
 import { ReportOpportunities } from "./ReportOpportunities";
 import { ReportRecommendations } from "./ReportRecommendations";
+import { ReportImagesAudit } from "./ReportImagesAudit";
+import { ReportLinksAudit } from "./ReportLinksAudit";
+import { ReportResourcesAudit } from "./ReportResourcesAudit";
+import { ReportStructuredData } from "./ReportStructuredData";
+import { ReportHeadingStructure } from "./ReportHeadingStructure";
 
 interface SEOReportViewerProps {
   analysis: SEOAnalysis;
@@ -31,6 +52,7 @@ export function SEOReportViewer({ analysis, projectName }: SEOReportViewerProps)
     exportToPdf(report, projectName);
   };
 
+  const hasExtended = Boolean(report.extendedData);
   const tabs = [
     { id: "cover", label: "Couverture", icon: FileText },
     { id: "summary", label: "Résumé", icon: BarChart3 },
@@ -38,6 +60,15 @@ export function SEOReportViewer({ analysis, projectName }: SEOReportViewerProps)
     { id: "performance", label: "Performance", icon: Gauge },
     { id: "accessibility", label: "Accessibilité", icon: Eye },
     { id: "best-practices", label: "Bonnes Pratiques", icon: Shield },
+    ...(hasExtended
+      ? [
+          { id: "images", label: "Images", icon: Image },
+          { id: "links", label: "Liens", icon: Link2 },
+          { id: "resources", label: "Ressources", icon: Package },
+          { id: "structured-data", label: "Données structurées", icon: Code2 },
+          { id: "headings", label: "Structure titres", icon: Heading },
+        ]
+      : []),
     { id: "opportunities", label: "Opportunités", icon: Lightbulb },
     { id: "recommendations", label: "Recommandations", icon: ClipboardList },
   ];
@@ -86,10 +117,11 @@ export function SEOReportViewer({ analysis, projectName }: SEOReportViewerProps)
 
         <div className="min-h-[500px]">
           <TabsContent value="cover" className="mt-0">
-            <ReportCover 
-              metadata={report.metadata} 
-              scores={report.scores} 
-              projectName={projectName} 
+            <ReportCover
+              metadata={report.metadata}
+              scores={report.scores}
+              desktopScores={report.desktopScores}
+              projectName={projectName}
             />
           </TabsContent>
 
@@ -133,6 +165,33 @@ export function SEOReportViewer({ analysis, projectName }: SEOReportViewerProps)
             <ReportOpportunities opportunities={report.opportunities} />
           </TabsContent>
 
+          {hasExtended && report.extendedData && (
+            <>
+              <TabsContent value="images" className="mt-0">
+                <ReportImagesAudit imagesWithoutAlt={report.extendedData.imagesWithoutAlt} />
+              </TabsContent>
+              <TabsContent value="links" className="mt-0">
+                <ReportLinksAudit linksWithoutText={report.extendedData.linksWithoutText} />
+              </TabsContent>
+              <TabsContent value="resources" className="mt-0">
+                <ReportResourcesAudit
+                  pageMetrics={report.extendedData.pageMetrics}
+                  renderBlockingResources={report.extendedData.renderBlockingResources}
+                  unusedJavascript={report.extendedData.unusedJavascript}
+                  unusedCss={report.extendedData.unusedCss}
+                />
+              </TabsContent>
+              <TabsContent value="structured-data" className="mt-0">
+                <ReportStructuredData
+                  structuredData={report.extendedData.structuredData}
+                  metaTags={report.extendedData.metaTags}
+                />
+              </TabsContent>
+              <TabsContent value="headings" className="mt-0">
+                <ReportHeadingStructure headingStructure={report.extendedData.headingStructure} />
+              </TabsContent>
+            </>
+          )}
           <TabsContent value="recommendations" className="mt-0">
             <ReportRecommendations recommendations={report.recommendations} />
           </TabsContent>

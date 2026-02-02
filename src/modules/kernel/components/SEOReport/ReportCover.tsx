@@ -8,10 +8,11 @@ import type { SEOReportMetadata, SEOReportScores } from "../../types/seoReport";
 interface ReportCoverProps {
   metadata: SEOReportMetadata;
   scores: SEOReportScores;
+  desktopScores?: SEOReportScores | null;
   projectName?: string;
 }
 
-export function ReportCover({ metadata, scores, projectName }: ReportCoverProps) {
+export function ReportCover({ metadata, scores, desktopScores, projectName }: ReportCoverProps) {
   const getStatusConfig = (status: SEOReportMetadata['status']) => {
     switch (status) {
       case 'excellent':
@@ -79,23 +80,31 @@ export function ReportCover({ metadata, scores, projectName }: ReportCoverProps)
             </div>
           </div>
 
-          {/* Mini scores */}
+          {/* Mini scores (Mobile, ou Mobile + Desktop) */}
           <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t">
             {[
-              { label: 'SEO', score: scores.seo },
-              { label: 'Performance', score: scores.performance },
-              { label: 'Accessibilité', score: scores.accessibility },
-              { label: 'Bonnes Pratiques', score: scores.bestPractices },
-            ].map((item) => (
-              <div key={item.label} className="text-center">
+              { label: 'SEO', key: 'seo' as const },
+              { label: 'Performance', key: 'performance' as const },
+              { label: 'Accessibilité', key: 'accessibility' as const },
+              { label: 'Bonnes Pratiques', key: 'bestPractices' as const },
+            ].map(({ label, key }) => (
+              <div key={label} className="text-center">
                 <div className={`text-2xl font-bold ${
-                  item.score >= 90 ? 'text-green-500' :
-                  item.score >= 70 ? 'text-blue-500' :
-                  item.score >= 50 ? 'text-yellow-500' : 'text-red-500'
+                  scores[key] >= 90 ? 'text-green-500' :
+                  scores[key] >= 70 ? 'text-blue-500' :
+                  scores[key] >= 50 ? 'text-yellow-500' : 'text-red-500'
                 }`}>
-                  {item.score}
+                  {scores[key]}
+                  {desktopScores && (
+                    <span className="text-sm font-normal text-muted-foreground ml-1">
+                      / {desktopScores[key]}
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs text-muted-foreground">{item.label}</div>
+                <div className="text-xs text-muted-foreground">
+                  {label}
+                  {desktopScores && <span className="block">M / D</span>}
+                </div>
               </div>
             ))}
           </div>

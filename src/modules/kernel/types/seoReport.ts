@@ -95,9 +95,87 @@ export interface SEORecommendation {
   impact: number;
 }
 
+// Données étendues extraites du rapport Lighthouse
+export interface ImageWithoutAlt {
+  src: string;
+  snippet?: string;
+  selector?: string;
+}
+
+export interface LinkWithoutText {
+  href?: string;
+  snippet?: string;
+  selector?: string;
+}
+
+export interface RenderBlockingResource {
+  url: string;
+  totalBytes?: number;
+  wastedMs?: number;
+}
+
+export interface UnusedResource {
+  url: string;
+  totalBytes?: number;
+  wastedBytes?: number;
+  wastedPercent?: number;
+}
+
+export interface PageMetrics {
+  totalSizeBytes: number;
+  totalRequests: number;
+  jsSize?: number;
+  cssSize?: number;
+  imageSize?: number;
+  fontSize?: number;
+}
+
+export interface StructuredDataInfo {
+  hasStructuredData: boolean;
+  types: string[];
+  raw?: unknown;
+}
+
+export interface MetaTagsInfo {
+  hasOpenGraph: boolean;
+  hasTwitterCards: boolean;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
+}
+
+export interface HeadingStructure {
+  h1: string[];
+  h2: string[];
+  h3: string[];
+  hasMultipleH1: boolean;
+}
+
+export interface ColorContrastIssue {
+  element?: string;
+  snippet?: string;
+  contrastRatio?: number;
+  expectedRatio?: number;
+}
+
+export interface SEOReportExtendedData {
+  imagesWithoutAlt: ImageWithoutAlt[];
+  linksWithoutText: LinkWithoutText[];
+  renderBlockingResources: RenderBlockingResource[];
+  unusedJavascript: UnusedResource[];
+  unusedCss: UnusedResource[];
+  pageMetrics: PageMetrics;
+  structuredData: StructuredDataInfo;
+  metaTags: MetaTagsInfo;
+  headingStructure: HeadingStructure;
+  colorContrastIssues: ColorContrastIssue[];
+}
+
 export interface SEOReport {
   metadata: SEOReportMetadata;
   scores: SEOReportScores;
+  /** Scores desktop (si analyse mobile + desktop) */
+  desktopScores?: SEOReportScores | null;
   seoDetails: SEOReportSEODetails;
   performanceMetrics: SEOReportPerformanceMetrics;
   accessibility: SEOReportAccessibility;
@@ -106,6 +184,8 @@ export interface SEOReport {
   recommendations: SEORecommendation[];
   strengths: string[];
   criticalIssues: string[];
+  /** Données étendues (images sans alt, liens, ressources, etc.) */
+  extendedData?: SEOReportExtendedData | null;
 }
 
 // Helper function to get status from score

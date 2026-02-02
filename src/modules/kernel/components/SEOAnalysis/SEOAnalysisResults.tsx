@@ -1,12 +1,22 @@
+import { useState } from "react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Globe, Gauge, Eye, Shield, ExternalLink, Download } from "lucide-react";
+import { Globe, Gauge, Eye, Shield, ExternalLink, Download, Smartphone, Monitor } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SEOScoreCard } from "./SEOScoreCard";
 import { SEOChecklist } from "./SEOChecklist";
 import { useSEOPdfExport } from "../../hooks/useSEOPdfExport";
+
+/** Scores desktop (mobile = colonnes seo_score, etc.) */
+export interface DesktopScores {
+  seo: number;
+  performance: number;
+  accessibility: number;
+  bestPractices: number;
+}
 
 export interface SEOAnalysis {
   id: string;
@@ -16,14 +26,34 @@ export interface SEOAnalysis {
   performance_score: number | null;
   accessibility_score: number | null;
   best_practices_score: number | null;
+  /** Scores desktop (si analyse mobile + desktop) */
+  desktop_scores?: DesktopScores | null;
   meta_description: string | null;
   has_meta_description: boolean;
   title_tag: string | null;
   has_viewport: boolean;
   is_crawlable: boolean;
   full_report: Record<string, unknown>;
+  full_report_desktop?: Record<string, unknown> | null;
   created_at: string;
   analyzed_at: string;
+  // Données extraites (optionnel, rétrocompat)
+  images_without_alt?: Array<{ src: string; snippet?: string; selector?: string }>;
+  links_without_text?: Array<{ href?: string; snippet?: string; selector?: string }>;
+  render_blocking_resources?: Array<{ url: string; totalBytes?: number; wastedMs?: number }>;
+  unused_javascript?: Array<{ url: string; totalBytes?: number; wastedBytes?: number }>;
+  unused_css?: Array<{ url: string; totalBytes?: number; wastedBytes?: number }>;
+  page_size_bytes?: number | null;
+  request_count?: number | null;
+  has_sitemap?: boolean | null;
+  has_robots_txt?: boolean | null;
+  has_structured_data?: boolean | null;
+  structured_data_types?: string[];
+  open_graph_tags?: { ogTitle?: string; ogDescription?: string; ogImage?: string; hasTwitterCards?: boolean } | null;
+  h1_tags?: string[];
+  h2_tags?: string[];
+  h3_tags?: string[];
+  color_contrast_issues?: Array<{ element?: string; snippet?: string; contrastRatio?: number; expectedRatio?: number }>;
 }
 
 interface SEOAnalysisResultsProps {
@@ -31,8 +61,24 @@ interface SEOAnalysisResultsProps {
   projectName?: string;
 }
 
+type DeviceView = "mobile" | "desktop";
+
 export function SEOAnalysisResults({ analysis, projectName }: SEOAnalysisResultsProps) {
   const { exportToPdf } = useSEOPdfExport();
+  const hasDesktop = Boolean(analysis.desktop_scores);
+  const [deviceView, setDeviceView] = useState<DeviceView>("mobile");
+
+  const mobileScores = {
+    seo: analysis.seo_score ?? 0,
+    performance: analysis.performance_score ?? 0,
+    accessibility: analysis.accessibility_score ?? 0,
+    bestPractices: analysis.best_practices_score ?? 0,
+  };
+  const desktopScores = analysis.desktop_scores ?? mobileScores;
+  const activeScores = deviceView === "desktop" ? desktopScores : mobileScores;
+  const overallActive = Math.round(
+    (activeScores.seo + activeScores.performance + activeScores.accessibility + activeScores.bestPractices) / 4
+  );
 
   const checkItems = [
     {
@@ -108,33 +154,91 @@ export function SEOAnalysisResults({ analysis, projectName }: SEOAnalysisResults
         </CardHeader>
       </Card>
 
+      {/* Toggle Mobile / Desktop */}
+      {hasDesktop && (
+        <Tabs value={deviceView} onValueChange={(v) => setDeviceView(v as DeviceView)}>
+          <TabsList className="grid w-full max-w-xs grid-cols-2">
+            <TabsTrigger value="mobile" className="gap-2">
+              <Smartphone className="h-4 w-4" />
+              Mobile
+            </TabsTrigger>
+            <TabsTrigger value="desktop" className="gap-2">
+              <Monitor className="h-4 w-4" />
+              Desktop
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
+
       {/* Score Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <SEOScoreCard
           title="SEO"
-          score={analysis.seo_score ?? 0}
+          score={activeScores.seo}
           icon={<Globe className="h-4 w-4 text-blue-500" />}
           description="Optimisation pour les moteurs de recherche"
         />
         <SEOScoreCard
           title="Performance"
-          score={analysis.performance_score ?? 0}
+          score={activeScores.performance}
           icon={<Gauge className="h-4 w-4 text-purple-500" />}
           description="Vitesse de chargement et réactivité"
         />
         <SEOScoreCard
           title="Accessibilité"
-          score={analysis.accessibility_score ?? 0}
+          score={activeScores.accessibility}
           icon={<Eye className="h-4 w-4 text-green-500" />}
           description="Accessibilité pour tous les utilisateurs"
         />
         <SEOScoreCard
           title="Bonnes Pratiques"
-          score={analysis.best_practices_score ?? 0}
+          score={activeScores.bestPractices}
           icon={<Shield className="h-4 w-4 text-orange-500" />}
           description="Standards du web moderne"
         />
       </div>
+
+      {/* Comparaison Mobile vs Desktop (barres côte à côte) */}
+      {hasDesktop && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Comparaison Mobile / Desktop</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(["seo", "performance", "accessibility", "bestPractices"] as const).map((key) => {
+              const labels: Record<typeof key, string> = {
+                seo: "SEO",
+                performance: "Performance",
+                accessibility: "Accessibilité",
+                bestPractices: "Bonnes Pratiques",
+              };
+              return (
+                <div key={key} className="flex items-center gap-3">
+                  <span className="w-28 text-sm text-muted-foreground">{labels[key]}</span>
+                  <div className="flex-1 flex gap-1 h-6 rounded overflow-hidden bg-muted">
+                    <div
+                      className="bg-blue-500 shrink-0"
+                      style={{ width: `${mobileScores[key]}%` }}
+                      title={`Mobile: ${mobileScores[key]}`}
+                    />
+                    <div
+                      className="bg-violet-500 shrink-0"
+                      style={{ width: `${desktopScores[key]}%` }}
+                      title={`Desktop: ${desktopScores[key]}`}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground w-20">
+                    M {mobileScores[key]} / D {desktopScores[key]}
+                  </span>
+                </div>
+              );
+            })}
+            <p className="text-xs text-muted-foreground mt-2">
+              Bleu = Mobile, Violet = Desktop
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Checklist */}
       <SEOChecklist items={checkItems} />
@@ -145,12 +249,7 @@ export function SEOAnalysisResults({ analysis, projectName }: SEOAnalysisResults
           variant="outline"
           className="text-lg py-2 px-6 font-semibold"
         >
-          Score global: {Math.round(
-            ((analysis.seo_score ?? 0) + 
-             (analysis.performance_score ?? 0) + 
-             (analysis.accessibility_score ?? 0) + 
-             (analysis.best_practices_score ?? 0)) / 4
-          )}/100
+          Score global ({deviceView}) : {overallActive}/100
         </Badge>
       </div>
     </div>

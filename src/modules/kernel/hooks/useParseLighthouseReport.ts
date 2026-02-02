@@ -4,8 +4,11 @@ import type {
   SEOOpportunity,
   SEORecommendation,
   PerformanceMetric,
+  SEOReportExtendedData,
+  SEOReportScores,
 } from "../types/seoReport";
 import { getScoreStatus, getMetricStatus } from "../types/seoReport";
+import { extractLighthouseExtended } from "./extractLighthouseExtended";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LighthouseAudit = Record<string, any>;
@@ -30,13 +33,23 @@ export function useParseLighthouseReport() {
     const audits = fullReport?.audits || {};
     const categories = fullReport?.categories || {};
 
-    // Scores
-    const scores = {
+    // Scores (mobile)
+    const scores: SEOReportScores = {
       seo: analysis.seo_score ?? 0,
       performance: analysis.performance_score ?? 0,
       accessibility: analysis.accessibility_score ?? 0,
       bestPractices: analysis.best_practices_score ?? 0,
     };
+
+    // Scores desktop (si analyse dual)
+    const desktopScores: SEOReportScores | null = analysis.desktop_scores
+      ? {
+          seo: analysis.desktop_scores.seo ?? 0,
+          performance: analysis.desktop_scores.performance ?? 0,
+          accessibility: analysis.desktop_scores.accessibility ?? 0,
+          bestPractices: analysis.desktop_scores.bestPractices ?? 0,
+        }
+      : null;
 
     const overallScore = Math.round(
       (scores.seo + scores.performance + scores.accessibility + scores.bestPractices) / 4
@@ -239,6 +252,46 @@ export function useParseLighthouseReport() {
       .slice(0, 5)
       .map(opp => opp.title);
 
+    // Données étendues : depuis la base ou extraction depuis full_report
+    let extendedData: SEOReportExtendedData | null = null;
+    if (
+      analysis.images_without_alt?.length !== undefined ||
+      analysis.page_size_bytes !== undefined
+    ) {
+      extendedData = buildExtendedDataFromAnalysis(analysis);
+    } else if (fullReport && typeof fullReport === "object") {
+      const extracted = extractLighthouseExtended(fullReport as Record<string, unknown>);
+      extendedData = {
+        imagesWithoutAlt: extracted.images_without_alt,
+        linksWithoutText: extracted.links_without_text,
+        renderBlockingResources: extracted.render_blocking_resources,
+        unusedJavascript: extracted.unused_javascript,
+        unusedCss: extracted.unused_css,
+        pageMetrics: {
+          totalSizeBytes: extracted.page_size_bytes ?? 0,
+          totalRequests: extracted.request_count ?? 0,
+        },
+        structuredData: {
+          hasStructuredData: extracted.has_structured_data ?? false,
+          types: extracted.structured_data_types ?? [],
+        },
+        metaTags: {
+          hasOpenGraph: Boolean(extracted.open_graph_tags?.ogTitle ?? extracted.open_graph_tags?.ogDescription ?? extracted.open_graph_tags?.ogImage),
+          hasTwitterCards: extracted.open_graph_tags?.hasTwitterCards ?? false,
+          ogTitle: extracted.open_graph_tags?.ogTitle,
+          ogDescription: extracted.open_graph_tags?.ogDescription,
+          ogImage: extracted.open_graph_tags?.ogImage,
+        },
+        headingStructure: {
+          h1: extracted.h1_tags ?? [],
+          h2: extracted.h2_tags ?? [],
+          h3: extracted.h3_tags ?? [],
+          hasMultipleH1: (extracted.h1_tags?.length ?? 0) > 1,
+        },
+        colorContrastIssues: extracted.color_contrast_issues ?? [],
+      };
+    }
+
     return {
       metadata: {
         url: analysis.website_url,
@@ -247,6 +300,7 @@ export function useParseLighthouseReport() {
         status: getScoreStatus(overallScore),
       },
       scores,
+      desktopScores: desktopScores ?? undefined,
       seoDetails,
       performanceMetrics,
       accessibility,
@@ -255,7 +309,46 @@ export function useParseLighthouseReport() {
       recommendations,
       strengths: strengths.slice(0, 5),
       criticalIssues,
+      extendedData: extendedData ?? undefined,
     };
+  };
+
+  return { parseReport };
+}
+
+function buildExtendedDataFromAnalysis(analysis: SEOAnalysis): SEOReportExtendedData {
+  return {
+    imagesWithoutAlt: analysis.images_without_alt ?? [],
+    linksWithoutText: analysis.links_without_text ?? [],
+    renderBlockingResources: analysis.render_blocking_resources ?? [],
+    unusedJavascript: analysis.unused_javascript ?? [],
+    unusedCss: analysis.unused_css ?? [],
+    pageMetrics: {
+      totalSizeBytes: analysis.page_size_bytes ?? 0,
+      totalRequests: analysis.request_count ?? 0,
+    },
+    structuredData: {
+      hasStructuredData: analysis.has_structured_data ?? false,
+      types: analysis.structured_data_types ?? [],
+    },
+    metaTags: {
+      hasOpenGraph: Boolean(
+        analysis.open_graph_tags?.ogTitle ??
+          analysis.open_graph_tags?.ogDescription ??
+          analysis.open_graph_tags?.ogImage
+      ),
+      hasTwitterCards: analysis.open_graph_tags?.hasTwitterCards ?? false,
+      ogTitle: analysis.open_graph_tags?.ogTitle,
+      ogDescription: analysis.open_graph_tags?.ogDescription,
+      ogImage: analysis.open_graph_tags?.ogImage,
+    },
+    headingStructure: {
+      h1: analysis.h1_tags ?? [],
+      h2: analysis.h2_tags ?? [],
+      h3: analysis.h3_tags ?? [],
+      hasMultipleH1: (analysis.h1_tags?.length ?? 0) > 1,
+    },
+    colorContrastIssues: analysis.color_contrast_issues ?? [],
   };
 
   return { parseReport };
